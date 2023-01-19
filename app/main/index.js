@@ -1,5 +1,12 @@
-import path from 'path';
-import { app, crashReporter, BrowserWindow, Menu } from 'electron';
+const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron')
+const path = require('path')
+const url = require('url')
+const fs = require("fs")
+const { getDirs } = require('./getDirs')
+const { dirsJsonParse } = require('./dirsJsonParse')
+const { getFilesInDir } = require('./getFilesInDir')
+const { searchCheck } = require('./searchCheck')
+const { download } = require('./download')
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -19,13 +26,6 @@ const installExtensions = async () => {
   }
 };
 
-crashReporter.start({
-  productName: 'YourName',
-  companyName: 'YourCompany',
-  submitURL: 'https://your-domain.com/url-to-submit',
-  uploadToServer: false,
-});
-
 app.on('window-all-closed', () => {
   // On OS X it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
@@ -40,17 +40,20 @@ app.on('ready', async () => {
   }
 
   mainWindow = new BrowserWindow({
-    width: 1000,
+    width: 1024,
     height: 800,
-    minWidth: 640,
-    minHeight: 480,
+    minWidth: 800,
+    minHeight: 600,
     show: false,
     webPreferences: {
       nodeIntegration: true,
+      contextIsolation: false,
+      webSecurity: false
     },
   });
 
-  mainWindow.loadFile(path.resolve(path.join(__dirname, '../renderer/index.html')));
+  // mainWindow.loadFile(path.resolve(path.join(__dirname, '../renderer/index.html')));
+  mainWindow.loadURL(`file://${__dirname}/../renderer/index.html`)
 
   // show window once on first load
   mainWindow.webContents.once('did-finish-load', () => {
@@ -101,3 +104,63 @@ app.on('ready', async () => {
     });
   }
 });
+
+const template = [];
+const menu = Menu.buildFromTemplate(template);
+Menu.setApplicationMenu(menu);
+
+
+ipcMain.on('search_clicked', (event, arg) => {
+  const status = searchCheck(arg['searchValue'])
+  { (status === 'ok') ? event.reply("send_dirs", getDirs(arg['searchValue'])) : event.reply("search_alert", status) }
+  // const data = getDirs(arg['searchValue'])
+
+})
+
+ipcMain.on('request_dirs', (event, arg) => {
+  const parsedDirs = dirsJsonParse()
+  event.reply("load_dirs", parsedDirs)
+})
+
+ipcMain.on('folder_clicked', (event, arg) => {
+  const data2 = getFilesInDir(arg)
+  event.reply("send_folder_dirs", data2)
+})
+
+ipcMain.on('download_request', (event, arg) => {
+  download()
+})
+
+ipcMain.on('dir_dialog', (event, arg) => {
+  // let progress = 0
+  // let file_num = arg.length
+  dialog.showOpenDialog({
+    properties: ['openDirectory']
+  }).then(result => {
+    event.reply("download_start", result.filePaths[0])
+    arg.map(img => {
+      fs.copyFile(img, path.join(result.filePaths[0], path.basename(img)), (err) => {
+        if (err) throw err;
+        event.reply("download_complete", "")
+      });
+    })
+
+  })
+})
+
+
+// // 하나씩 전송되게 하려면 이렇게 해야하는데, 그러면 다운받는동안 다른 일을 못함..
+// ipcMain.on('dir_dialog', (event, arg) => {
+//   let progress = 0
+//   let file_num = arg.length
+//   dialog.showOpenDialog({
+//     properties: ['openDirectory']
+//   }).then(result => {
+//     arg.map(img => {
+//       progress++
+//       fs.copyFileSync(img, path.join(result.filePaths[0], path.basename(img)))
+//       event.reply("download_progress", Math.ceil(progress / file_num * 100))
+//     })
+
+//   })
+// })

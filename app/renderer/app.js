@@ -1,28 +1,22 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { Provider } from 'react-redux';
-import { ConnectedRouter } from 'connected-react-router';
-import { createMemoryHistory } from 'history';
-import routes from './routes';
-import configureStore from './store';
+import React from 'react'
+import { render } from 'react-dom'
+import { createStore } from "redux";
+import { Provider } from "react-redux";
+import DermaView from './components/DermaView';
+import reducer from './redux/reducer';
 
-const syncHistoryWithStore = (store, history) => {
-  const { router } = store.getState();
-  if (router && router.location) {
-    history.replace(router.location);
-  }
-};
+let root = document.createElement('div')
+root.id = 'root'
+document.body.appendChild(root)
+document.body.style.margin = 0
 
-const initialState = {};
-const routerHistory = createMemoryHistory();
-const store = configureStore(initialState, routerHistory);
-syncHistoryWithStore(store, routerHistory);
+const store = createStore(reducer);
 
 const rootElement = document.querySelector(document.currentScript.getAttribute('data-container'));
 
-ReactDOM.render(
+render(
   <Provider store={store}>
-    <ConnectedRouter history={routerHistory}>{routes}</ConnectedRouter>
+    <DermaView />
   </Provider>,
   rootElement,
 );
